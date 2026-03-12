@@ -54,7 +54,7 @@ export function SetupShellIntegration({
     setError(undefined)
 
     try {
-      await installShellIntegration(selectedShell, "branchlet")
+      await installShellIntegration(selectedShell, "saltree")
       setStep("success")
 
       setTimeout(() => {
@@ -96,7 +96,7 @@ export function SetupShellIntegration({
           </Text>
           <Box marginTop={1}>
             <Text color={COLORS.SUCCESS}>
-              Try it now: <Text bold>branchlet</Text>
+              Try it now: <Text bold>saltree</Text>
             </Text>
           </Box>
         </Box>
@@ -122,7 +122,7 @@ export function SetupShellIntegration({
 
   if (step === "confirm" && selectedShell) {
     const configFile = selectedShell === "zsh" ? "~/.zshrc" : "~/.bashrc"
-    const commandName = "branchlet"
+    const commandName = "saltree"
 
     return (
       <ConfirmDialog
@@ -149,7 +149,7 @@ ${commandName}() {
   if [ $# -eq 0 ]; then
     local dir=$(FORCE_COLOR=3 command ${commandName} --from-wrapper)
     if [ -n "$dir" ]; then
-      builtin cd "$dir" && echo "Branchlet: Navigated to $(pwd)"
+      builtin cd "$dir" && echo "Saltree: Navigated to $(pwd)"
     fi
   else
     command ${commandName} "$@"
@@ -192,7 +192,7 @@ ${commandName}() {
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text color={COLORS.INFO}>
-          Shell integration wraps the <Text bold>branchlet</Text> command to enable quick directory
+          Shell integration wraps the <Text bold>saltree</Text> command to enable quick directory
           switching.
         </Text>
       </Box>

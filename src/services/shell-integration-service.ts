@@ -10,8 +10,8 @@ export interface ShellIntegrationStatus {
   reason?: string
 }
 
-const WRAPPER_SIGNATURE = "# Branchlet setup: added on"
-const SETUP_END_MARKER = "# End Branchlet setup"
+const WRAPPER_SIGNATURE = "# Saltree setup: added on"
+const SETUP_END_MARKER = "# End Saltree setup"
 
 /**
  * Detects if shell integration is installed
@@ -71,7 +71,7 @@ export async function detectShellIntegration(): Promise<ShellIntegrationStatus> 
  */
 export async function installShellIntegration(
   shell: "zsh" | "bash",
-  commandName = "branchlet"
+  commandName = "saltree"
 ): Promise<void> {
   const configPath = getConfigPath(shell)
   if (!configPath) {
@@ -207,7 +207,7 @@ ${commandName}() {
   if [ $# -eq 0 ]; then
     local dir=$(FORCE_COLOR=3 command ${commandName} --from-wrapper)
     if [ -n "$dir" ]; then
-      builtin cd "$dir" && echo "Branchlet: Navigated to $(pwd)"
+      builtin cd "$dir" && echo "Saltree: Navigated to $(pwd)"
     fi
   else
     command ${commandName} "$@"
@@ -217,7 +217,7 @@ ${SETUP_END_MARKER}`
 }
 
 function generateBashCompletions(): string {
-  return `_branchlet_completions() {
+  return `_saltree_completions() {
   local cur="\${COMP_WORDS[COMP_CWORD]}"
   local commands="create list delete settings"
   local flags="--help --version --mode --from-wrapper"
@@ -227,11 +227,11 @@ function generateBashCompletions(): string {
     COMPREPLY=($(compgen -W "menu create list delete settings" -- "\${cur}"))
   fi
 }
-complete -F _branchlet_completions branchlet`
+complete -F _saltree_completions saltree`
 }
 
 function generateZshCompletions(): string {
-  return `_branchlet() {
+  return `_saltree() {
   local -a commands
   commands=(
     'create:Create a new worktree'
@@ -247,9 +247,9 @@ function generateZshCompletions(): string {
     '1:command:->command'
   case "$state" in
     command)
-      _describe -t commands 'branchlet commands' commands
+      _describe -t commands 'saltree commands' commands
       ;;
   esac
 }
-compdef _branchlet branchlet`
+compdef _saltree saltree`
 }

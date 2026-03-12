@@ -14,6 +14,7 @@ import type { WorktreeService } from "../services/index.js"
 import type { ShellIntegrationStatus } from "../services/shell-integration-service.js"
 import type { UpdateCheckResult } from "../services/update-service.js"
 import type { AppMode } from "../types/index.js"
+import { IntroSplash } from "./intro-splash.js"
 import { UpdateBanner } from "./update-banner.js"
 import { WelcomeHeader } from "./welcome-header.js"
 
@@ -45,75 +46,82 @@ export function AppRouter({
   onShellIntegrationComplete,
 }: AppRouterProps) {
   const [borderColor, setBorderColor] = useState<string>(COLORS.MUTED)
+  const [introComplete, setIntroComplete] = useState(false)
 
   return (
     <BorderContext.Provider value={{ setBorderColor }}>
       <Box flexDirection="column">
-        <UpdateBanner updateStatus={updateStatus} />
-        <WelcomeHeader mode={mode} gitRoot={gitRoot} />
+        {!introComplete ? (
+          <IntroSplash gitRoot={gitRoot} onComplete={() => setIntroComplete(true)} />
+        ) : (
+          <>
+            <UpdateBanner updateStatus={updateStatus} />
+            <WelcomeHeader mode={mode} gitRoot={gitRoot} />
 
-        {mode === "menu" && (
-          <Box borderStyle="round" paddingX={1} borderColor={COLORS.MUTED}>
-            <MainPanel
-              onSelect={onMenuSelect}
-              onCancel={onExit}
-              defaultIndex={lastMenuIndex}
-              shellIntegrationStatus={shellIntegrationStatus}
-            />
-          </Box>
-        )}
+            {mode === "menu" && (
+              <Box borderStyle="round" paddingX={1} borderColor={COLORS.MUTED}>
+                <MainPanel
+                  onSelect={onMenuSelect}
+                  onCancel={onExit}
+                  defaultIndex={lastMenuIndex}
+                  shellIntegrationStatus={shellIntegrationStatus}
+                />
+              </Box>
+            )}
 
-        {mode === "create" && (
-          <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
-            <CreateWorktree
-              worktreeService={worktreeService}
-              onComplete={onBackToMenu}
-              onCancel={onBackToMenu}
-            />
-          </Box>
-        )}
+            {mode === "create" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <CreateWorktree
+                  worktreeService={worktreeService}
+                  onComplete={onBackToMenu}
+                  onCancel={onBackToMenu}
+                />
+              </Box>
+            )}
 
-        {mode === "list" && (
-          <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
-            <ListWorktrees
-              worktreeService={worktreeService}
-              onBack={onBackToMenu}
-              isFromWrapper={isFromWrapper}
-              onPathSelect={(path) => {
-                process.stdout.write(`${path}\n`)
-                onExit()
-              }}
-            />
-          </Box>
-        )}
+            {mode === "list" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <ListWorktrees
+                  worktreeService={worktreeService}
+                  onBack={onBackToMenu}
+                  isFromWrapper={isFromWrapper}
+                  onPathSelect={(path) => {
+                    process.stdout.write(`${path}\n`)
+                    onExit()
+                  }}
+                />
+              </Box>
+            )}
 
-        {mode === "delete" && (
-          <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
-            <DeleteWorktree
-              worktreeService={worktreeService}
-              onComplete={onBackToMenu}
-              onCancel={onBackToMenu}
-            />
-          </Box>
-        )}
+            {mode === "delete" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <DeleteWorktree
+                  worktreeService={worktreeService}
+                  onComplete={onBackToMenu}
+                  onCancel={onBackToMenu}
+                />
+              </Box>
+            )}
 
-        {mode === "settings" && (
-          <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
-            <SettingsMenu worktreeService={worktreeService} onBack={onBackToMenu} />
-          </Box>
-        )}
+            {mode === "settings" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <SettingsMenu worktreeService={worktreeService} onBack={onBackToMenu} />
+              </Box>
+            )}
 
-        {mode === "setup" && (
-          <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
-            <SetupShellIntegration
-              shellIntegrationStatus={shellIntegrationStatus}
-              onComplete={() => {
-                onShellIntegrationComplete()
-                onBackToMenu()
-              }}
-              onCancel={onBackToMenu}
-            />
-          </Box>
+            {mode === "setup" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <SetupShellIntegration
+                  shellIntegrationStatus={shellIntegrationStatus}
+                  onComplete={() => {
+                    onShellIntegrationComplete()
+                    onBackToMenu()
+                  }}
+                  onCancel={onBackToMenu}
+                />
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </BorderContext.Provider>

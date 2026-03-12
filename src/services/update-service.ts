@@ -9,7 +9,7 @@ export interface UpdateCheckResult {
   error?: string
 }
 
-const NPM_REGISTRY_URL = "https://registry.npmjs.org/branchlet/latest"
+const NPM_REGISTRY_URL = "https://registry.npmjs.org/saltree/latest"
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export function shouldCheckForUpdates(appStateService: AppStateService): boolean {

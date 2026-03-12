@@ -31,7 +31,7 @@ export function UpdateBanner({ updateStatus }: UpdateBannerProps) {
         <Text color={COLORS.MUTED}>
           Run:{" "}
           <Text bold color={COLORS.PRIMARY}>
-            npm install -g branchlet
+            npm install -g saltree
           </Text>{" "}
           to update
         </Text>

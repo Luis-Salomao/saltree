@@ -36,7 +36,7 @@ function parseArguments(): {
   }
 
   if (argv.version) {
-    console.log(`Branchlet v${VERSION}`)
+    console.log(`Saltree v${VERSION}`)
     process.exit(0)
   }
 
@@ -87,7 +87,7 @@ function showHelp(): void {
 ${MESSAGES.WELCOME}
 
 Usage:
-  branchlet [command] [options]
+  saltree [command] [options]
 
 Commands:
   create     Create a new worktree
@@ -111,30 +111,28 @@ Non-Interactive Options:
   --json                 Output as JSON (list)
 
 Interactive Examples:
-  branchlet                # Start interactive menu
-  branchlet create         # Go directly to create worktree flow
-  branchlet list           # List all worktrees interactively
-  branchlet --from-wrapper # Used by shell wrapper to enable directory switching
-  branchlet delete         # Go directly to delete worktree flow
-  branchlet settings       # Open settings menu
+  saltree                # Start interactive menu
+  saltree create         # Go directly to create worktree flow
+  saltree list           # List all worktrees interactively
+  saltree --from-wrapper # Used by shell wrapper to enable directory switching
+  saltree delete         # Go directly to delete worktree flow
+  saltree settings       # Open settings menu
 
 Non-Interactive Examples:
-  branchlet create -n my-feature -s main              # Create worktree from main
-  branchlet create -n my-feature -s main -b feat/foo  # Create with new branch
-  branchlet list --json                               # List worktrees as JSON
-  branchlet delete -n my-feature                      # Delete worktree by name
-  branchlet delete -p /path/to/worktree -f            # Force delete by path
+  saltree create -n my-feature -s main              # Create worktree from main
+  saltree create -n my-feature -s main -b feat/foo  # Create with new branch
+  saltree list --json                               # List worktrees as JSON
+  saltree delete -n my-feature                      # Delete worktree by name
+  saltree delete -p /path/to/worktree -f            # Force delete by path
 
 Shell Integration:
-  Run 'branchlet' and select "Setup Shell Integration" to enable quick directory switching.
-  After setup, just run 'branchlet' to quickly change to any worktree directory.
+  Run 'saltree' and select "Setup Shell Integration" to enable quick directory switching.
+  After setup, just run 'saltree' to quickly change to any worktree directory.
 
 Configuration:
   The tool looks for configuration files in the following order:
-  1. .branchlet.json in current directory
-  2. ~/.branchlet/settings.json (global config)
-
-For more information, visit: https://github.com/raghavpillai/git-worktree-manager
+  1. .saltree.json in current directory
+  2. ~/.saltree/settings.json (global config)
 `)
 }
 

@@ -1,11 +1,11 @@
 {
-  "name": "branchlet",
+  "name": "saltree",
   "version": "1.1.0",
   "description": "CLI for creating and managing Git worktrees",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "branchlet": "dist/index.js"
+    "saltree": "dist/index.js"
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
@@ -33,9 +33,7 @@
     "codex"
   ],
   "author": {
-    "name": "Raghav Pillai",
-    "email": "me@raghav.sh",
-    "url": "https://raghav.sh"
+    "name": "Luis Salomao"
   },
   "license": "MIT",
   "files": [
@@ -44,6 +42,7 @@
     "schema.json"
   ],
   "dependencies": {
+    "chalk": "^5.6.2",
     "glob": "^13.0.6",
     "ink": "^6.2.2",
     "ink-spinner": "^5.0.0",

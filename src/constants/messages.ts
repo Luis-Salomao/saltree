@@ -1,6 +1,6 @@
 export const MESSAGES = {
   // Welcome and general
-  WELCOME: "Branchlet - Git Worktree Manager",
+  WELCOME: "SalTree - Git Worktree Manager",
 
   // Menu options
   MENU_TITLE: "What would you like to do?",
@@ -77,15 +77,15 @@ export const MESSAGES = {
   UPDATE_CHECKING: "Checking for updates...",
   UPDATE_UP_TO_DATE: "You're running the latest version",
   UPDATE_FAILED: "Failed to check for updates",
-  UPDATE_INSTALL_CMD: "npm install -g branchlet",
+  UPDATE_INSTALL_CMD: "npm install -g saltree",
 } as const
 
 export const COLORS = {
-  PRIMARY: "#61dafb",
-  SUCCESS: "#28a745",
-  WARNING: "#ffc107",
-  ERROR: "#dc3545",
-  INFO: "#17a2b8",
-  MUTED: "#6c757d",
-  HIGHLIGHT: "#007bff",
+  PRIMARY: "#f2f2f2",
+  SUCCESS: "#2f9e44",
+  WARNING: "#f08c00",
+  ERROR: "#c92a2a",
+  INFO: "#0b7285",
+  MUTED: "#868e96",
+  HIGHLIGHT: "#495057",
 } as const
