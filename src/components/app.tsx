@@ -4,6 +4,7 @@ import packageJson from "../../package.json" with { type: "json" }
 import { COLORS } from "../constants/index.js"
 import { AppStateService } from "../services/app-state-service.js"
 import { ConfigService } from "../services/config-service.js"
+import { GlobalSettingsService } from "../services/global-settings-service.js"
 import { WorktreeService } from "../services/index.js"
 import type { ShellIntegrationStatus } from "../services/shell-integration-service.js"
 import { detectShellIntegration } from "../services/shell-integration-service.js"
@@ -15,6 +16,7 @@ import {
 } from "../services/update-service.js"
 import type { AppMode } from "../types/index.js"
 import { getGitRoot, getUserFriendlyErrorMessage } from "../utils/index.js"
+import { Onboarding } from "../panels/onboarding/index.js"
 import { AppRouter } from "./app-router.js"
 import { ErrorState } from "./error-state.js"
 import { LoadingState } from "./loading-state.js"
@@ -39,9 +41,20 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
   const [shellIntegrationStatus, setShellIntegrationStatus] =
     useState<ShellIntegrationStatus | null>(null)
   const [updateStatus, setUpdateStatus] = useState<UpdateCheckResult | null>(null)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [globalSettingsService] = useState(() => new GlobalSettingsService())
 
   const initialize = useCallback(async (): Promise<void> => {
     try {
+      // Carregar settings globais e verificar onboarding
+      await globalSettingsService.load()
+      if (globalSettingsService.needsOnboarding()) {
+        setNeedsOnboarding(true)
+        setInitializing(false)
+        setLoading(false)
+        return
+      }
+
       const root = await getGitRoot()
       const workingDir = root || process.cwd()
       setGitRoot(workingDir)
@@ -143,12 +156,25 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
     }
   }
 
+  const handleOnboardingComplete = useCallback(async (userName: string): Promise<void> => {
+    globalSettingsService.setUserName(userName)
+    await globalSettingsService.save()
+    setNeedsOnboarding(false)
+    setInitializing(true)
+    setLoading(true)
+    await initialize()
+  }, [globalSettingsService, initialize])
+
   useEffect(() => {
     initialize()
   }, [initialize])
 
   if (initializing) {
     return null
+  }
+
+  if (needsOnboarding) {
+    return <Onboarding onComplete={handleOnboardingComplete} />
   }
 
   if (loading) {
