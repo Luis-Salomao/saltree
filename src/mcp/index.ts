@@ -14,7 +14,7 @@ import { GlobalSettingsService } from "../services/global-settings-service.js"
 import { WorkspaceRegistryService } from "../services/workspace-registry-service.js"
 import { executeGitCommand } from "../utils/git-commands.js"
 import { sanitizeBranchForFs } from "../utils/path-utils.js"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 // ─── Server ──────────────────────────────────────────────────
 
@@ -116,7 +116,8 @@ Use quando: precisar criar um novo projeto com padrão bare repo.`,
       const settings = new GlobalSettingsService()
       await settings.load()
       const userName = settings.getUserName() || "user"
-      const baseDir = params.base_dir || settings.getDefaultBaseDir() || process.cwd()
+      const configuredBaseDir = params.base_dir || settings.getDefaultBaseDir() || process.cwd()
+      const baseDir = resolve(configuredBaseDir)
 
       const basePath = join(baseDir, userName, params.project_name)
       const barePath = `${basePath}.git`

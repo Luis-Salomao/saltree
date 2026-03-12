@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises"
-import { join } from "node:path"
+import { resolve } from "node:path"
 import type { BareRepoConfig, BareRepoOptions } from "../types/index"
 import { executeGitCommand } from "../utils/git-commands.js"
 
@@ -23,7 +23,8 @@ export class BareRepoService {
    * Cria o primeiro worktree com commit inicial.
    */
   async initBare(options: BareRepoOptions): Promise<void> {
-    const { barePath, defaultBranch = "main" } = options
+    const { defaultBranch = "main" } = options
+    const barePath = resolve(options.barePath)
 
     await mkdir(barePath, { recursive: true })
 
@@ -42,7 +43,8 @@ export class BareRepoService {
    * Configura fetch refspec (crítico — sem isso git fetch não traz nada).
    */
   async cloneBare(options: BareRepoOptions): Promise<void> {
-    const { barePath, repoUrl, defaultBranch } = options
+    const { repoUrl, defaultBranch } = options
+    const barePath = resolve(options.barePath)
 
     if (!repoUrl) {
       throw new Error("repoUrl é obrigatório para clone-https")
@@ -82,16 +84,18 @@ export class BareRepoService {
     branch: string,
     options?: { createBranch?: boolean; sourceBranch?: string }
   ): Promise<void> {
+    const resolvedBarePath = resolve(barePath)
+    const resolvedWorktreePath = resolve(worktreePath)
     const args = ["worktree", "add"]
 
     if (options?.createBranch) {
       args.push("-b", branch)
-      args.push(worktreePath, options.sourceBranch || "HEAD")
+      args.push(resolvedWorktreePath, options.sourceBranch || "HEAD")
     } else {
-      args.push(worktreePath, branch)
+      args.push(resolvedWorktreePath, branch)
     }
 
-    await this.exec(args, barePath)
+    await this.exec(args, resolvedBarePath)
   }
 
   /**
@@ -103,29 +107,34 @@ export class BareRepoService {
     worktreePath: string,
     defaultBranch = "main"
   ): Promise<void> {
+    const resolvedBarePath = resolve(barePath)
+    const resolvedWorktreePath = resolve(worktreePath)
     // Criar worktree — para repo novo, usar --detach e depois criar branch
-    await this.exec(["worktree", "add", "--detach", worktreePath], barePath)
+    await this.exec(["worktree", "add", "--detach", resolvedWorktreePath], resolvedBarePath)
 
     // Dentro do worktree: criar commit inicial e branch
-    await this.exec(["checkout", "-b", defaultBranch], worktreePath)
-    await this.exec(["commit", "--allow-empty", "-m", "initial commit"], worktreePath)
+    await this.exec(["checkout", "-b", defaultBranch], resolvedWorktreePath)
+    await this.exec(["commit", "--allow-empty", "-m", "initial commit"], resolvedWorktreePath)
   }
 
   /**
    * Remove um worktree.
    */
   async removeWorktree(barePath: string, worktreePath: string, force = false): Promise<void> {
+    const resolvedBarePath = resolve(barePath)
+    const resolvedWorktreePath = resolve(worktreePath)
     const args = ["worktree", "remove"]
     if (force) args.push("--force")
-    args.push(worktreePath)
-    await this.exec(args, barePath)
+    args.push(resolvedWorktreePath)
+    await this.exec(args, resolvedBarePath)
   }
 
   /**
    * Lista worktrees de um bare repo.
    */
   async listWorktrees(barePath: string): Promise<string[]> {
-    const result = await this.exec(["worktree", "list", "--porcelain"], barePath)
+    const resolvedBarePath = resolve(barePath)
+    const result = await this.exec(["worktree", "list", "--porcelain"], resolvedBarePath)
     return result.stdout
       .split("\n")
       .filter((l) => l.startsWith("worktree "))
@@ -137,6 +146,7 @@ export class BareRepoService {
    * Baseado em boas práticas para paralelismo com IA.
    */
   private async applyProfessionalConfig(barePath: string): Promise<void> {
+    const resolvedBarePath = resolve(barePath)
     const configs: [string, string][] = [
       // Performance de fetch
       ["fetch.parallel", String(this.config.fetchParallel)],
@@ -152,13 +162,13 @@ export class BareRepoService {
     }
 
     for (const [key, value] of configs) {
-      await this.exec(["config", key, value], barePath)
+      await this.exec(["config", key, value], resolvedBarePath)
     }
 
     // Manutenção incremental
     if (this.config.enableMaintenance) {
       try {
-        await this.exec(["maintenance", "register"], barePath)
+        await this.exec(["maintenance", "register"], resolvedBarePath)
       } catch {
         // git maintenance pode não estar disponível em versões antigas
       }
@@ -169,7 +179,8 @@ export class BareRepoService {
    * Roda fetch com todas as otimizações.
    */
   async fetchAll(barePath: string): Promise<void> {
-    await this.exec(["fetch", "--all", "--prune"], barePath)
+    const resolvedBarePath = resolve(barePath)
+    await this.exec(["fetch", "--all", "--prune"], resolvedBarePath)
   }
 
   /**
@@ -177,7 +188,7 @@ export class BareRepoService {
    */
   async isBareRepo(path: string): Promise<boolean> {
     try {
-      const result = await this.exec(["rev-parse", "--is-bare-repository"], path)
+      const result = await this.exec(["rev-parse", "--is-bare-repository"], resolve(path))
       return result.stdout.trim() === "true"
     } catch {
       return false

@@ -6,7 +6,7 @@ import { BareRepoService } from "../../services/bare-repo-service.js"
 import { GlobalSettingsService } from "../../services/global-settings-service.js"
 import { WorkspaceRegistryService } from "../../services/workspace-registry-service.js"
 import type { SelectOption, WorkspaceCreateMode } from "../../types/index.js"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 interface CreateWorkspacePanelProps {
   onBack: () => void
@@ -57,7 +57,8 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
       const settingsService = new GlobalSettingsService()
       await settingsService.load()
       const userName = settingsService.getUserName() || "user"
-      const resolvedBaseDir = dir || settingsService.getDefaultBaseDir() || process.cwd()
+      const configuredBaseDir = dir || settingsService.getDefaultBaseDir() || process.cwd()
+      const resolvedBaseDir = resolve(configuredBaseDir)
 
       const basePath = join(resolvedBaseDir, userName, projectName)
       const barePath = `${basePath}.git`
