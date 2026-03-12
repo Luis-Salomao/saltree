@@ -100,3 +100,67 @@ export function validateBranchName(name: string): string | undefined {
 
   return undefined
 }
+
+/**
+ * Nomes reservados do Windows que não podem ser usados como nome de pasta.
+ */
+const WINDOWS_RESERVED_NAMES = new Set([
+  "CON", "PRN", "AUX", "NUL",
+  "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+  "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+])
+
+/**
+ * Sanitiza um nome de branch para uso como nome de pasta no filesystem.
+ * Branch Git permanece original (ex: feat/auth).
+ * Path fica seguro para Windows (ex: feat-auth).
+ *
+ * Regras:
+ * - Substitui / e \ pelo replacement (default: -)
+ * - Remove caracteres inválidos no Windows (<>:"|?*)
+ * - Remove pontos e espaços finais
+ * - Evita nomes reservados do Windows (CON, PRN, etc)
+ * - Limita a 255 caracteres
+ */
+export function sanitizeBranchForFs(
+  branchName: string,
+  options?: { prefix?: string; replacement?: string }
+): string {
+  const { prefix = "", replacement = "-" } = options || {}
+
+  let sanitized = branchName
+    // Substituir separadores de path
+    .replace(/[/\\]/g, replacement)
+    // Remover caracteres inválidos no Windows
+    .replace(/[<>:"|?*]/g, "")
+    // Remover caracteres de controle
+    .replace(/[\x00-\x1f]/g, "")
+    // Colapsar replacements consecutivos
+    .replace(new RegExp(`${escapeRegex(replacement)}{2,}`, "g"), replacement)
+    // Trim de pontos e espaços finais
+    .replace(/[.\s]+$/, "")
+    // Trim de replacement no início e fim
+    .replace(new RegExp(`^${escapeRegex(replacement)}+|${escapeRegex(replacement)}+$`, "g"), "")
+
+  // Adicionar prefixo
+  if (prefix) {
+    sanitized = `${prefix}${sanitized}`
+  }
+
+  // Evitar nomes reservados do Windows
+  const upperName = sanitized.toUpperCase().split(".")[0] || ""
+  if (WINDOWS_RESERVED_NAMES.has(upperName)) {
+    sanitized = `_${sanitized}`
+  }
+
+  // Limitar tamanho
+  if (sanitized.length > 255) {
+    sanitized = sanitized.slice(0, 255)
+  }
+
+  return sanitized
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
