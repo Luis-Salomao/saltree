@@ -30,8 +30,19 @@ export function MainPanel({
 
     options.push(
       {
+        label: MESSAGES.MENU_WORKSPACES,
+        value: "workspaces",
+        description: "listar workspaces registrados",
+      },
+      {
+        label: MESSAGES.MENU_CREATE_WORKSPACE,
+        value: "create-workspace",
+        description: "novo repo ou clone HTTPS",
+      },
+      {
         label: MESSAGES.MENU_CREATE,
         value: "create",
+        description: "worktree no repo atual",
       },
       {
         label: MESSAGES.MENU_LIST,

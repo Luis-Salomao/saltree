@@ -9,6 +9,8 @@ export const MESSAGES = {
   MENU_LIST: "List worktrees",
   MENU_DELETE: "Delete worktree",
   MENU_SETTINGS: "Settings",
+  MENU_WORKSPACES: "Workspaces",
+  MENU_CREATE_WORKSPACE: "Create workspace",
   MENU_EXIT: "Exit",
 
   // Create flow
@@ -78,6 +80,23 @@ export const MESSAGES = {
   UPDATE_UP_TO_DATE: "You're running the latest version",
   UPDATE_FAILED: "Failed to check for updates",
   UPDATE_INSTALL_CMD: "npm install -g saltree",
+
+  // Workspace flow
+  WORKSPACE_LIST_TITLE: "Seus workspaces",
+  WORKSPACE_NO_WORKSPACES: "Nenhum workspace registrado.",
+  WORKSPACE_CREATE_TITLE: "Criar workspace",
+  WORKSPACE_CREATE_MODE_PROMPT: "Como deseja criar o workspace?",
+  WORKSPACE_CREATE_MODE_NEW: "Novo repositório Git local",
+  WORKSPACE_CREATE_MODE_CLONE: "Clonar via HTTPS",
+  WORKSPACE_PROJECT_NAME_PROMPT: "Nome do projeto:",
+  WORKSPACE_REPO_URL_PROMPT: "URL do repositório (HTTPS):",
+  WORKSPACE_BASE_DIR_PROMPT: "Diretório base (Enter para usar padrão):",
+  WORKSPACE_CREATING: "Criando workspace...",
+  WORKSPACE_CLONE_BARE: "Clonando bare repo...",
+  WORKSPACE_INIT_BARE: "Inicializando bare repo...",
+  WORKSPACE_CONFIG_REPO: "Configurando repo...",
+  WORKSPACE_CREATE_WORKTREE: "Criando worktree principal...",
+  WORKSPACE_SUCCESS: "Workspace criado com sucesso!",
 } as const
 
 export const COLORS = {

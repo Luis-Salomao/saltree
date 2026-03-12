@@ -55,7 +55,9 @@ export function WelcomeHeader({ mode, gitRoot }: WelcomeHeaderProps) {
       )
     }
 
-    const modeLabels = {
+    const modeLabels: Record<string, string> = {
+      workspaces: "Workspaces",
+      "create-workspace": "Create Workspace",
       create: "Create",
       list: "List",
       delete: "Delete",

@@ -3,12 +3,14 @@ import { useState } from "react"
 import { COLORS } from "../constants/index.js"
 import { BorderContext } from "../contexts/border-context.js"
 import {
+  CreateWorkspacePanel,
   CreateWorktree,
   DeleteWorktree,
   ListWorktrees,
   MainPanel,
   SettingsMenu,
   SetupShellIntegration,
+  WorkspacesPanel,
 } from "../panels/index.js"
 import type { WorktreeService } from "../services/index.js"
 import type { ShellIntegrationStatus } from "../services/shell-integration-service.js"
@@ -106,6 +108,18 @@ export function AppRouter({
             {mode === "settings" && (
               <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
                 <SettingsMenu worktreeService={worktreeService} onBack={onBackToMenu} />
+              </Box>
+            )}
+
+            {mode === "workspaces" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <WorkspacesPanel onBack={onBackToMenu} />
+              </Box>
+            )}
+
+            {mode === "create-workspace" && (
+              <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
+                <CreateWorkspacePanel onBack={onBackToMenu} onComplete={onBackToMenu} />
               </Box>
             )}
 
