@@ -2,11 +2,9 @@ import { Box, Text } from "ink"
 import { useState } from "react"
 import { InputPrompt, SelectPrompt, StatusIndicator } from "../../components/common/index.js"
 import { COLORS, MESSAGES } from "../../constants/index.js"
-import { BareRepoService } from "../../services/bare-repo-service.js"
-import { GlobalSettingsService } from "../../services/global-settings-service.js"
-import { WorkspaceRegistryService } from "../../services/workspace-registry-service.js"
+import { NormalRepoService } from "../../services/normal-repo-service.js"
 import type { SelectOption, WorkspaceCreateMode } from "../../types/index.js"
-import { join, resolve } from "node:path"
+import { resolve } from "node:path"
 
 interface CreateWorkspacePanelProps {
   onBack: () => void
@@ -54,46 +52,27 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
 
   const createWorkspace = async (dir: string) => {
     try {
-      const settingsService = new GlobalSettingsService()
-      await settingsService.load()
-      const userName = settingsService.getUserName() || "user"
-      const configuredBaseDir = dir || settingsService.getDefaultBaseDir() || process.cwd()
-      const resolvedBaseDir = resolve(configuredBaseDir)
-
-      const basePath = join(resolvedBaseDir, userName, projectName)
-      const barePath = `${basePath}.git`
-      const worktreePath = basePath
-
-      const bareService = new BareRepoService()
+      const resolvedBaseDir = resolve(dir || process.cwd())
+      const normalService = new NormalRepoService()
 
       if (mode === "clone-https") {
         setStatusMsg(MESSAGES.WORKSPACE_CLONE_BARE)
-        await bareService.cloneBare({ barePath, repoUrl })
+        await normalService.cloneNormalRepo({
+          projectName,
+          mode: "clone-https",
+          repoUrl,
+          baseDir: resolvedBaseDir,
+          defaultBranch: "main",
+        })
       } else {
         setStatusMsg(MESSAGES.WORKSPACE_INIT_BARE)
-        await bareService.initBare({ barePath })
+        await normalService.initNormalRepo({
+          projectName,
+          mode: "new-local",
+          baseDir: resolvedBaseDir,
+          defaultBranch: "main",
+        })
       }
-
-      setStatusMsg(MESSAGES.WORKSPACE_CREATE_WORKTREE)
-      if (mode === "new-local") {
-        await bareService.createInitialWorktree(barePath, worktreePath)
-      } else {
-        await bareService.addWorktree(barePath, worktreePath, "main")
-      }
-
-      setStatusMsg("Registrando workspace...")
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      await registry.addWorkspace({
-        owner: userName,
-        projectName,
-        repoType: mode,
-        repoUrl: mode === "clone-https" ? repoUrl : undefined,
-        barePath,
-        basePath,
-        defaultBranch: "main",
-        active: true,
-      })
 
       setStep("success")
       setTimeout(onComplete, 2000)
@@ -107,12 +86,12 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
     {
       label: MESSAGES.WORKSPACE_CREATE_MODE_NEW,
       value: "new-local",
-      description: "git init --bare",
+      description: "git init (repo novo local)",
     },
     {
       label: MESSAGES.WORKSPACE_CREATE_MODE_CLONE,
       value: "clone-https",
-      description: "git clone --bare",
+      description: "git clone (clonar repositório)",
     },
   ]
 

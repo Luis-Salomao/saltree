@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * MCP Server para Saltree — gerenciador de workspaces com bare repos.
+ * MCP Server para Saltree — gerenciador de workspaces Git normais.
  *
- * Permite que LLMs operem workspaces Git: listar, criar, deletar worktrees,
- * e gerenciar repositórios bare de forma profissional.
+ * Permite que LLMs operem workspaces Git: criar workspaces, criar/deletar worktrees,
+ * e gerenciar repositórios normais de forma profissional.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
-import { BareRepoService } from "../services/bare-repo-service.js"
+import { NormalRepoService } from "../services/normal-repo-service.js"
+import { WorkspaceService } from "../services/workspace-service.js"
+import { WorktreeService } from "../services/worktree-service.js"
 import { GlobalSettingsService } from "../services/global-settings-service.js"
 import { WorkspaceRegistryService } from "../services/workspace-registry-service.js"
 import { executeGitCommand } from "../utils/git-commands.js"
@@ -78,9 +80,9 @@ server.registerTool(
   "saltree_create_workspace",
   {
     title: "Criar workspace saltree",
-    description: `Cria um novo workspace com bare repo. Dois modos:
-- "new-local": git init --bare + worktree principal com commit inicial
-- "clone-https": git clone --bare + configura fetch refspec + worktree principal
+    description: `Cria um novo workspace com repo Git normal. Dois modos:
+- "new-local": git init + .saltree/ auto-criado + worktree initial + pós-create commands
+- "clone-https": git clone + .saltree/ auto-criado + worktree initial + pós-create commands
 
 Args:
   - project_name: Nome do projeto (ex: "api-core")
@@ -90,9 +92,9 @@ Args:
   - default_branch: Branch padrão (default: "main")
 
 Returns JSON:
-  { success: true, workspace: { id, barePath, basePath, worktreePath } }
+  { success: true, workspace: { workspaceRoot, projectName, repoType, createdAt } }
 
-Use quando: precisar criar um novo projeto com padrão bare repo.`,
+Use quando: precisar criar um novo projeto com padrão repo normal.`,
     inputSchema: z.object({
       project_name: z.string().min(1).max(100).describe("Nome do projeto"),
       mode: z.enum(["new-local", "clone-https"]).describe("Modo de criação"),
@@ -113,46 +115,35 @@ Use quando: precisar criar um novo projeto com padrão bare repo.`,
         return errorResult("repo_url é obrigatório para modo clone-https")
       }
 
-      const settings = new GlobalSettingsService()
-      await settings.load()
-      const userName = settings.getUserName() || "user"
-      const configuredBaseDir = params.base_dir || settings.getDefaultBaseDir() || process.cwd()
-      const baseDir = resolve(configuredBaseDir)
+      const baseDir = params.base_dir || process.cwd()
+      const normalService = new NormalRepoService()
 
-      const basePath = join(baseDir, userName, params.project_name)
-      const barePath = `${basePath}.git`
-      const worktreePath = basePath
-
-      const bareService = new BareRepoService()
-
+      let workspace
       if (params.mode === "clone-https") {
-        await bareService.cloneBare({
-          barePath,
+        workspace = await normalService.cloneNormalRepo({
+          projectName: params.project_name,
+          mode: "clone-https",
           repoUrl: params.repo_url!,
+          baseDir,
           defaultBranch: params.default_branch,
         })
-        await bareService.addWorktree(barePath, worktreePath, params.default_branch)
       } else {
-        await bareService.initBare({ barePath, defaultBranch: params.default_branch })
-        await bareService.createInitialWorktree(barePath, worktreePath, params.default_branch)
+        workspace = await normalService.initNormalRepo({
+          projectName: params.project_name,
+          mode: "new-local",
+          baseDir,
+          defaultBranch: params.default_branch,
+        })
       }
-
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = await registry.addWorkspace({
-        owner: userName,
-        projectName: params.project_name,
-        repoType: params.mode,
-        repoUrl: params.mode === "clone-https" ? params.repo_url : undefined,
-        barePath,
-        basePath,
-        defaultBranch: params.default_branch,
-        active: true,
-      })
 
       return jsonResult({
         success: true,
-        workspace: { id: workspace.id, barePath, basePath, worktreePath },
+        workspace: {
+          workspaceRoot: workspace.workspaceRoot,
+          projectName: workspace.projectName,
+          repoType: workspace.repoType,
+          createdAt: workspace.createdAt,
+        },
       })
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : String(error))
@@ -165,17 +156,19 @@ server.registerTool(
   "saltree_list_worktrees",
   {
     title: "Listar worktrees de um workspace",
-    description: `Lista todos os worktrees de um bare repo registrado no saltree.
+    description: `Lista todos os worktrees de um workspace.
+
+⚠️ IMPORTANTE: Este comando só funciona DENTRO de um workspace (dir com .git/).
 
 Args:
-  - workspace_id: ID do workspace (ex: "ws_20260312_001")
+  - workspace_root: Caminho do workspace root (opcional, auto-detecta se omitido)
 
 Returns JSON:
   { worktrees: [path1, path2, ...] }
 
 Use quando: precisar ver quais worktrees existem em um workspace.`,
     inputSchema: z.object({
-      workspace_id: z.string().describe("ID do workspace"),
+      workspace_root: z.string().optional().describe("Workspace root (auto-detecta se omitido)"),
     }).strict(),
     annotations: {
       readOnlyHint: true,
@@ -186,14 +179,17 @@ Use quando: precisar ver quais worktrees existem em um workspace.`,
   },
   async (params) => {
     try {
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = registry.getWorkspaceById(params.workspace_id)
-      if (!workspace) return errorResult(`Workspace ${params.workspace_id} não encontrado`)
+      // Detect workspace
+      const cwd = params.workspace_root || process.cwd()
+      const workspaceRoot = await WorkspaceService.getWorkspaceRootOrThrow(cwd)
 
-      const bareService = new BareRepoService()
-      const worktrees = await bareService.listWorktrees(workspace.barePath)
-      return jsonResult({ workspace_id: params.workspace_id, worktrees })
+      const result = await executeGitCommand(["worktree", "list"], workspaceRoot)
+      const worktrees: string[] = []
+      if (result.success) {
+        worktrees.push(...result.stdout.split("\n").filter(Boolean))
+      }
+
+      return jsonResult({ workspace_root: workspaceRoot, worktrees })
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : String(error))
     }
@@ -205,25 +201,27 @@ server.registerTool(
   "saltree_create_worktree",
   {
     title: "Criar worktree em um workspace",
-    description: `Cria um novo worktree a partir do bare repo de um workspace.
+    description: `Cria um novo worktree dentro de um workspace. Permite trabalhar em branches diferentes simultaneamente.
+
+⚠️ IMPORTANTE: Este comando só funciona DENTRO de um workspace (dir com .git/).
 
 Args:
-  - workspace_id: ID do workspace
-  - branch: Nome da branch (ex: "feat/auth")
+  - branch: Nome da branch (ex: "feat/auth", "bugfix/typo")
   - create_branch: Se true, cria nova branch (default: true)
   - source_branch: Branch de origem para nova branch (default: "main")
+  - workspace_root: Caminho do workspace root (opcional, auto-detecta se omitido)
 
 O nome da pasta é automaticamente sanitizado (feat/auth → feat-auth).
 
 Returns JSON:
   { success: true, worktree_path: "...", branch: "feat/auth" }
 
-Use quando: precisar criar uma worktree para trabalhar em uma feature/fix.`,
+Use quando: precisar criar uma worktree para trabalhar em uma feature/fix dentro de um workspace.`,
     inputSchema: z.object({
-      workspace_id: z.string().describe("ID do workspace"),
       branch: z.string().min(1).describe("Nome da branch (ex: feat/auth)"),
       create_branch: z.boolean().default(true).describe("Criar nova branch"),
       source_branch: z.string().default("main").describe("Branch de origem"),
+      workspace_root: z.string().optional().describe("Workspace root (auto-detecta se omitido)"),
     }).strict(),
     annotations: {
       readOnlyHint: false,
@@ -234,21 +232,28 @@ Use quando: precisar criar uma worktree para trabalhar em uma feature/fix.`,
   },
   async (params) => {
     try {
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = registry.getWorkspaceById(params.workspace_id)
-      if (!workspace) return errorResult(`Workspace ${params.workspace_id} não encontrado`)
+      // Detect workspace (auto or from param)
+      const cwd = params.workspace_root || process.cwd()
+      const workspaceRoot = await WorkspaceService.getWorkspaceRootOrThrow(cwd)
+
+      // Create worktree using WorktreeService
+      const worktreeService = new WorktreeService(workspaceRoot)
+      await worktreeService.initialize()
 
       const dirName = sanitizeBranchForFs(params.branch)
-      const worktreePath = join(workspace.basePath + "-wt", dirName)
-
-      const bareService = new BareRepoService()
-      await bareService.addWorktree(workspace.barePath, worktreePath, params.branch, {
-        createBranch: params.create_branch,
+      await worktreeService.createWorktree({
+        name: dirName,
+        newBranch: params.branch,
         sourceBranch: params.source_branch,
+        basePath: workspaceRoot,
       })
 
-      return jsonResult({ success: true, worktree_path: worktreePath, branch: params.branch })
+      const worktreePath = join(workspaceRoot, dirName)
+      return jsonResult({
+        success: true,
+        worktree_path: worktreePath,
+        branch: params.branch,
+      })
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : String(error))
     }
@@ -260,21 +265,23 @@ server.registerTool(
   "saltree_delete_worktree",
   {
     title: "Deletar worktree",
-    description: `Remove um worktree de um workspace bare repo.
+    description: `Remove um worktree de um workspace.
+
+⚠️ IMPORTANTE: Este comando só funciona DENTRO de um workspace (dir com .git/).
 
 Args:
-  - workspace_id: ID do workspace
-  - worktree_path: Caminho completo do worktree a remover
+  - worktree_name: Nome da pasta da worktree (ex: "feat-auth") ou caminho completo
   - force: Forçar remoção mesmo com alterações não commitadas (default: false)
+  - workspace_root: Caminho do workspace root (opcional, auto-detecta se omitido)
 
 Returns JSON:
-  { success: true, removed: "..." }
+  { success: true, removed: "worktre_name" }
 
 Use quando: precisar limpar um worktree que não é mais necessário.`,
     inputSchema: z.object({
-      workspace_id: z.string().describe("ID do workspace"),
-      worktree_path: z.string().describe("Caminho completo do worktree"),
+      worktree_name: z.string().describe("Nome da pasta da worktree ou caminho completo"),
       force: z.boolean().default(false).describe("Forçar remoção"),
+      workspace_root: z.string().optional().describe("Workspace root (auto-detecta se omitido)"),
     }).strict(),
     annotations: {
       readOnlyHint: false,
@@ -285,37 +292,42 @@ Use quando: precisar limpar um worktree que não é mais necessário.`,
   },
   async (params) => {
     try {
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = registry.getWorkspaceById(params.workspace_id)
-      if (!workspace) return errorResult(`Workspace ${params.workspace_id} não encontrado`)
+      // Detect workspace
+      const cwd = params.workspace_root || process.cwd()
+      const workspaceRoot = await WorkspaceService.getWorkspaceRootOrThrow(cwd)
 
-      const bareService = new BareRepoService()
-      await bareService.removeWorktree(workspace.barePath, params.worktree_path, params.force)
+      // Delete worktree using WorktreeService
+      const worktreeService = new WorktreeService(workspaceRoot)
+      await worktreeService.initialize()
 
-      return jsonResult({ success: true, removed: params.worktree_path })
+      const worktreePath = join(workspaceRoot, params.worktree_name)
+      await worktreeService.deleteWorktree(worktreePath, params.force)
+
+      return jsonResult({ success: true, removed: params.worktree_name })
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : String(error))
     }
   }
 )
 
-// 6. Status do workspace (fetch + status)
+// 6. Status do workspace
 server.registerTool(
   "saltree_workspace_status",
   {
     title: "Status do workspace",
-    description: `Retorna informações sobre um workspace: se o bare repo existe, quantos worktrees tem, e branches disponíveis.
+    description: `Retorna informações sobre um workspace: se o repo existe, quantos worktrees tem, e branches disponíveis.
+
+⚠️ IMPORTANTE: Este comando só funciona DENTRO de um workspace (dir com .git/).
 
 Args:
-  - workspace_id: ID do workspace
+  - workspace_root: Caminho do workspace root (opcional, auto-detecta se omitido)
 
 Returns JSON:
-  { id, projectName, barePath, isBareRepo, worktrees, branches }
+  { projectName, workspaceRoot, worktrees, branches }
 
 Use quando: precisar verificar o estado de um workspace antes de operar nele.`,
     inputSchema: z.object({
-      workspace_id: z.string().describe("ID do workspace"),
+      workspace_root: z.string().optional().describe("Workspace root (auto-detecta se omitido)"),
     }).strict(),
     annotations: {
       readOnlyHint: true,
@@ -326,31 +338,30 @@ Use quando: precisar verificar o estado de um workspace antes de operar nele.`,
   },
   async (params) => {
     try {
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = registry.getWorkspaceById(params.workspace_id)
-      if (!workspace) return errorResult(`Workspace ${params.workspace_id} não encontrado`)
+      // Detect workspace
+      const cwd = params.workspace_root || process.cwd()
+      const workspaceRoot = await WorkspaceService.getWorkspaceRootOrThrow(cwd)
 
-      const bareService = new BareRepoService()
-      const isBare = await bareService.isBareRepo(workspace.barePath)
-      const worktrees = isBare ? await bareService.listWorktrees(workspace.barePath) : []
+      // Get worktrees
+      const result = await executeGitCommand(["worktree", "list"], workspaceRoot)
+      const worktrees: string[] = []
+      if (result.success) {
+        worktrees.push(...result.stdout.split("\n").filter(Boolean))
+      }
 
+      // Get branches
       let branches: string[] = []
-      if (isBare) {
-        const result = await executeGitCommand(["branch", "--list"], workspace.barePath)
-        if (result.success) {
-          branches = result.stdout
-            .split("\n")
-            .map((l) => l.replace("*", "").trim())
-            .filter(Boolean)
-        }
+      const branchResult = await executeGitCommand(["branch", "--list"], workspaceRoot)
+      if (branchResult.success) {
+        branches = branchResult.stdout
+          .split("\n")
+          .map((l) => l.replace("*", "").trim())
+          .filter(Boolean)
       }
 
       return jsonResult({
-        id: workspace.id,
-        projectName: workspace.projectName,
-        barePath: workspace.barePath,
-        isBareRepo: isBare,
+        projectName: workspaceRoot.split(/[\\/]/).pop() || "unknown",
+        workspaceRoot,
         worktrees,
         branches,
       })
@@ -365,17 +376,19 @@ server.registerTool(
   "saltree_fetch",
   {
     title: "Fetch updates do workspace",
-    description: `Roda git fetch --all --prune no bare repo de um workspace.
+    description: `Roda git fetch --all --prune no workspace.
+
+⚠️ IMPORTANTE: Este comando só funciona DENTRO de um workspace (dir com .git/).
 
 Args:
-  - workspace_id: ID do workspace
+  - workspace_root: Caminho do workspace root (opcional, auto-detecta se omitido)
 
 Returns JSON:
   { success: true, message: "Fetch concluído" }
 
-Use quando: precisar atualizar o bare repo com as últimas mudanças do remote.`,
+Use quando: precisar atualizar o workspace com as últimas mudanças do remote.`,
     inputSchema: z.object({
-      workspace_id: z.string().describe("ID do workspace"),
+      workspace_root: z.string().optional().describe("Workspace root (auto-detecta se omitido)"),
     }).strict(),
     annotations: {
       readOnlyHint: false,
@@ -386,13 +399,11 @@ Use quando: precisar atualizar o bare repo com as últimas mudanças do remote.`
   },
   async (params) => {
     try {
-      const registry = new WorkspaceRegistryService()
-      await registry.load()
-      const workspace = registry.getWorkspaceById(params.workspace_id)
-      if (!workspace) return errorResult(`Workspace ${params.workspace_id} não encontrado`)
+      // Detect workspace
+      const cwd = params.workspace_root || process.cwd()
+      const workspaceRoot = await WorkspaceService.getWorkspaceRootOrThrow(cwd)
 
-      const bareService = new BareRepoService()
-      await bareService.fetchAll(workspace.barePath)
+      await executeGitCommand(["fetch", "--all", "--prune"], workspaceRoot)
 
       return jsonResult({ success: true, message: "Fetch concluído" })
     } catch (error) {
