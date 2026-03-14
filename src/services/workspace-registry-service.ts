@@ -97,14 +97,34 @@ export class WorkspaceRegistryService {
     const infos: WorkspaceInfo[] = []
 
     for (const item of items) {
-      let worktreeCount = 0
+      let exists = false
       try {
-        const result = await executeGitCommand(["worktree", "list", "--porcelain"], item.barePath)
-        if (result.success) {
-          worktreeCount = result.stdout.split("\n").filter((l) => l.startsWith("worktree ")).length
-        }
+        await access(item.basePath)
+        exists = true
       } catch {
-        // Bare repo pode não existir mais
+        exists = false
+      }
+
+      let worktreeCount = 0
+      if (exists) {
+        try {
+          const result = await executeGitCommand(["worktree", "list", "--porcelain"], item.basePath)
+          if (result.success) {
+            worktreeCount = result.stdout.split("\n").filter((l) => l.startsWith("worktree ")).length
+          }
+        } catch {
+          // Workspace pode ter estrutura antiga (barePath) ou estar inconsistente
+          try {
+            const fallback = await executeGitCommand(["worktree", "list", "--porcelain"], item.barePath)
+            if (fallback.success) {
+              worktreeCount = fallback.stdout
+                .split("\n")
+                .filter((l) => l.startsWith("worktree ")).length
+            }
+          } catch {
+            // Ignora e mantém contagem em 0
+          }
+        }
       }
 
       const info: WorkspaceInfo = {
@@ -116,6 +136,7 @@ export class WorkspaceRegistryService {
         repoType: item.repoType,
         defaultBranch: item.defaultBranch,
         worktreeCount,
+        exists,
         active: item.active,
         createdAt: item.createdAt,
       }

@@ -26,6 +26,7 @@ interface AppRouterProps {
   lastMenuIndex: number
   gitRoot?: string | undefined
   shellIntegrationStatus: ShellIntegrationStatus | null
+  canUseWorktreeCommands: boolean
   updateStatus: UpdateCheckResult | null
   isFromWrapper: boolean
   onMenuSelect: (value: AppMode | "exit", selectedIndex?: number) => void
@@ -40,6 +41,7 @@ export function AppRouter({
   lastMenuIndex,
   gitRoot,
   shellIntegrationStatus,
+  canUseWorktreeCommands,
   updateStatus,
   isFromWrapper,
   onMenuSelect,
@@ -67,6 +69,7 @@ export function AppRouter({
                   onCancel={onExit}
                   defaultIndex={lastMenuIndex}
                   shellIntegrationStatus={shellIntegrationStatus}
+                  canUseWorktreeCommands={canUseWorktreeCommands}
                 />
               </Box>
             )}

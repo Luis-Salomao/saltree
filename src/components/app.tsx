@@ -1,4 +1,6 @@
 import { Text, useInput } from "ink"
+import { access } from "node:fs/promises"
+import { join } from "node:path"
 import { useCallback, useEffect, useState } from "react"
 import packageJson from "../../package.json" with { type: "json" }
 import { COLORS } from "../constants/index.js"
@@ -42,6 +44,7 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
     useState<ShellIntegrationStatus | null>(null)
   const [updateStatus, setUpdateStatus] = useState<UpdateCheckResult | null>(null)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [canUseWorktreeCommands, setCanUseWorktreeCommands] = useState(false)
   const [globalSettingsService] = useState(() => new GlobalSettingsService())
 
   const initialize = useCallback(async (): Promise<void> => {
@@ -58,6 +61,16 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
       const root = await getGitRoot()
       const workingDir = root || process.cwd()
       setGitRoot(workingDir)
+
+      // Worktree commands are available only inside a Saltree workspace.
+      // A valid workspace has local config at the repo root.
+      try {
+        await access(join(workingDir, "saltree.config.json"))
+        setCanUseWorktreeCommands(true)
+      } catch {
+        setCanUseWorktreeCommands(false)
+      }
+
       setInitializing(false)
 
       setLoading(true)
@@ -149,6 +162,14 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
     if (selectedIndex !== undefined) {
       setLastMenuIndex(selectedIndex)
     }
+
+    if (!canUseWorktreeCommands && (value === "create" || value === "list" || value === "delete")) {
+      setError(
+        "Comandos de worktree so funcionam dentro de um workspace SalTree. Entre em um workspace criado pelo SalTree e tente novamente."
+      )
+      return
+    }
+
     if (value === "exit") {
       handleExit()
     } else {
@@ -204,6 +225,7 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
       lastMenuIndex={lastMenuIndex}
       gitRoot={gitRoot}
       shellIntegrationStatus={shellIntegrationStatus}
+      canUseWorktreeCommands={canUseWorktreeCommands}
       updateStatus={updateStatus}
       isFromWrapper={isFromWrapper}
       onMenuSelect={handleMenuSelect}

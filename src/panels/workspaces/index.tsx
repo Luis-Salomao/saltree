@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from "ink"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { StatusIndicator } from "../../components/common/index.js"
 import { COLORS, MESSAGES } from "../../constants/index.js"
 import { WorkspaceRegistryService } from "../../services/workspace-registry-service.js"
@@ -13,17 +13,39 @@ export function WorkspacesPanel({ onBack }: WorkspacesPanelProps) {
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [error, setError] = useState<string>()
 
-  useEffect(() => {
-    const load = async () => {
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(undefined)
       const registry = new WorkspaceRegistryService()
       await registry.load()
       const infos = await registry.getWorkspacesWithInfo()
       setWorkspaces(infos)
+      if (selectedIndex >= infos.length) {
+        setSelectedIndex(Math.max(0, infos.length - 1))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
       setLoading(false)
     }
-    load()
-  }, [])
+  }, [selectedIndex])
+
+  useEffect(() => {
+    void loadWorkspaces()
+  }, [loadWorkspaces])
+
+  const removeMissingWorkspace = useCallback(async () => {
+    const selected = workspaces[selectedIndex]
+    if (!selected || selected.exists) return
+
+    const registry = new WorkspaceRegistryService()
+    await registry.load()
+    await registry.removeWorkspace(selected.id)
+    await loadWorkspaces()
+  }, [loadWorkspaces, selectedIndex, workspaces])
 
   useInput((input, key) => {
     if (key.escape) {
@@ -36,10 +58,25 @@ export function WorkspacesPanel({ onBack }: WorkspacesPanelProps) {
     if (key.downArrow && selectedIndex < workspaces.length - 1) {
       setSelectedIndex(selectedIndex + 1)
     }
+
+    if (key.rightArrow) {
+      void removeMissingWorkspace()
+    }
   })
 
   if (loading) {
     return <StatusIndicator status="loading" message="Carregando workspaces..." spinner />
+  }
+
+  if (error) {
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text color={COLORS.ERROR}>Erro ao carregar workspaces: {error}</Text>
+        <Text color={COLORS.MUTED} dimColor>
+          Pressione Esc para voltar
+        </Text>
+      </Box>
+    )
   }
 
   if (workspaces.length === 0) {
@@ -73,6 +110,11 @@ export function WorkspacesPanel({ onBack }: WorkspacesPanelProps) {
           <Text color={COLORS.INFO} dimColor>
             {ws.worktreeCount} worktree{ws.worktreeCount !== 1 ? "s" : ""}
           </Text>
+          {!ws.exists && (
+            <Text color={COLORS.ERROR}>
+              [apagado]
+            </Text>
+          )}
           <Text color={COLORS.MUTED} dimColor>
             {ws.basePath}
           </Text>
@@ -81,7 +123,7 @@ export function WorkspacesPanel({ onBack }: WorkspacesPanelProps) {
 
       <Box marginTop={1}>
         <Text color={COLORS.MUTED} dimColor>
-          ↑↓ navegar · Esc voltar
+          ↑↓ navegar · → remover apagado · Esc voltar
         </Text>
       </Box>
     </Box>

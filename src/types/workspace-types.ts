@@ -32,6 +32,7 @@ export interface WorkspaceInfo {
   repoUrl?: string
   defaultBranch: string
   worktreeCount: number
+  exists: boolean
   active: boolean
   createdAt: string
 }

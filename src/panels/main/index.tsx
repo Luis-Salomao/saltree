@@ -8,6 +8,7 @@ interface MainPanelProps {
   onCancel: () => void
   defaultIndex?: number
   shellIntegrationStatus: ShellIntegrationStatus | null
+  canUseWorktreeCommands: boolean
 }
 
 export function MainPanel({
@@ -15,6 +16,7 @@ export function MainPanel({
   onCancel,
   defaultIndex = 0,
   shellIntegrationStatus,
+  canUseWorktreeCommands,
 }: MainPanelProps) {
   const getMenuOptions = (): SelectOption<AppMode | "exit">[] => {
     const options: SelectOption<AppMode | "exit">[] = []
@@ -38,20 +40,28 @@ export function MainPanel({
         label: MESSAGES.MENU_CREATE_WORKSPACE,
         value: "create-workspace",
         description: "novo repo ou clone HTTPS",
-      },
-      {
-        label: MESSAGES.MENU_CREATE,
-        value: "create",
-        description: "worktree no repo atual",
-      },
-      {
-        label: MESSAGES.MENU_LIST,
-        value: "list",
-      },
-      {
-        label: MESSAGES.MENU_DELETE,
-        value: "delete",
-      },
+      }
+    )
+
+    if (canUseWorktreeCommands) {
+      options.push(
+        {
+          label: MESSAGES.MENU_CREATE,
+          value: "create",
+          description: "worktree no workspace atual",
+        },
+        {
+          label: MESSAGES.MENU_LIST,
+          value: "list",
+        },
+        {
+          label: MESSAGES.MENU_DELETE,
+          value: "delete",
+        }
+      )
+    }
+
+    options.push(
       {
         label: MESSAGES.MENU_SETTINGS,
         value: "settings",
