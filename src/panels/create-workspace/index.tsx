@@ -109,6 +109,7 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
   if (step === "repo-url") {
     return (
       <InputPrompt
+        key="repo-url"
         label={MESSAGES.WORKSPACE_REPO_URL_PROMPT}
         placeholder="https://github.com/org/repo.git"
         validate={(value) => {
@@ -125,6 +126,7 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
   if (step === "project-name") {
     return (
       <InputPrompt
+        key="project-name"
         label={MESSAGES.WORKSPACE_PROJECT_NAME_PROMPT}
         placeholder="meu-projeto"
         defaultValue={projectName}
@@ -142,6 +144,7 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
   if (step === "base-dir") {
     return (
       <InputPrompt
+        key="base-dir"
         label={MESSAGES.WORKSPACE_BASE_DIR_PROMPT}
         placeholder={process.cwd()}
         onSubmit={handleBaseDir}

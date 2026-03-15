@@ -87,8 +87,15 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
           })
         })
 
-      const service = new WorktreeService(workingDir)
-      await service.initialize()
+      // WorktreeService só funciona dentro de um git repo — falha silenciosa fora
+      try {
+        const service = new WorktreeService(workingDir)
+        await service.initialize()
+        setWorktreeService(service)
+      } catch {
+        // Fora de git repo: worktree commands indisponíveis, app continua normalmente
+        setCanUseWorktreeCommands(false)
+      }
 
       const appStateService = new AppStateService()
       await appStateService.load()
@@ -109,7 +116,6 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
         }
       }
 
-      setWorktreeService(service)
     } catch (err) {
       setError(getUserFriendlyErrorMessage(err instanceof Error ? err : new Error(String(err))))
     } finally {

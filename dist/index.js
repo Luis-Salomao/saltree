@@ -56007,7 +56007,7 @@ function CreateWorkspacePanel({ onBack, onComplete }) {
       },
       onSubmit: handleRepoUrl,
       onCancel: onBack
-    }, undefined, false, undefined, this);
+    }, "repo-url", false, undefined, this);
   }
   if (step === "project-name") {
     return /* @__PURE__ */ jsx_dev_runtime8.jsxDEV(InputPrompt, {
@@ -56023,7 +56023,7 @@ function CreateWorkspacePanel({ onBack, onComplete }) {
       },
       onSubmit: handleProjectName,
       onCancel: onBack
-    }, undefined, false, undefined, this);
+    }, "project-name", false, undefined, this);
   }
   if (step === "base-dir") {
     return /* @__PURE__ */ jsx_dev_runtime8.jsxDEV(InputPrompt, {
@@ -56031,7 +56031,7 @@ function CreateWorkspacePanel({ onBack, onComplete }) {
       placeholder: process.cwd(),
       onSubmit: handleBaseDir,
       onCancel: onBack
-    }, undefined, false, undefined, this);
+    }, "base-dir", false, undefined, this);
   }
   if (step === "creating") {
     return /* @__PURE__ */ jsx_dev_runtime8.jsxDEV(StatusIndicator, {
@@ -58597,8 +58597,13 @@ function App2({ initialMode = "menu", isFromWrapper = false, onExit }) {
           reason: "Detection failed"
         });
       });
-      const service = new WorktreeService(workingDir);
-      await service.initialize();
+      try {
+        const service = new WorktreeService(workingDir);
+        await service.initialize();
+        setWorktreeService(service);
+      } catch {
+        setCanUseWorktreeCommands(false);
+      }
       const appStateService = new AppStateService;
       await appStateService.load();
       if (shouldCheckForUpdates(appStateService)) {
@@ -58614,7 +58619,6 @@ function App2({ initialMode = "menu", isFromWrapper = false, onExit }) {
           setUpdateStatus(cached2);
         }
       }
-      setWorktreeService(service);
     } catch (err) {
       setError(getUserFriendlyErrorMessage(err instanceof Error ? err : new Error(String(err))));
     } finally {
