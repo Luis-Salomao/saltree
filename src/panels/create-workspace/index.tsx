@@ -3,8 +3,10 @@ import { useState } from "react"
 import { InputPrompt, SelectPrompt, StatusIndicator } from "../../components/common/index.js"
 import { COLORS, MESSAGES } from "../../constants/index.js"
 import { NormalRepoService } from "../../services/normal-repo-service.js"
+import { GlobalSettingsService } from "../../services/global-settings-service.js"
+import { WorkspaceRegistryService } from "../../services/workspace-registry-service.js"
 import type { SelectOption, WorkspaceCreateMode } from "../../types/index.js"
-import { resolve } from "node:path"
+import { resolve, join } from "node:path"
 
 interface CreateWorkspacePanelProps {
   onBack: () => void
@@ -73,6 +75,24 @@ export function CreateWorkspacePanel({ onBack, onComplete }: CreateWorkspacePane
           defaultBranch: "main",
         })
       }
+
+      // Registrar workspace no registry global
+      const settingsService = new GlobalSettingsService()
+      await settingsService.load()
+      const owner = settingsService.getUserName() || "user"
+
+      const registry = new WorkspaceRegistryService()
+      await registry.load()
+      await registry.addWorkspace({
+        owner,
+        projectName,
+        repoType: mode,
+        ...(mode === "clone-https" ? { repoUrl } : {}),
+        barePath: join(resolvedBaseDir, projectName, ".repo"),
+        basePath: join(resolvedBaseDir, projectName),
+        defaultBranch: "main",
+        active: true,
+      })
 
       setStep("success")
       setTimeout(onComplete, 2000)

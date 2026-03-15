@@ -22,7 +22,7 @@ import { WelcomeHeader } from "./welcome-header.js"
 
 interface AppRouterProps {
   mode: AppMode
-  worktreeService: WorktreeService
+  worktreeService: WorktreeService | null
   lastMenuIndex: number
   gitRoot?: string | undefined
   shellIntegrationStatus: ShellIntegrationStatus | null
@@ -74,7 +74,7 @@ export function AppRouter({
               </Box>
             )}
 
-            {mode === "create" && (
+            {mode === "create" && worktreeService && (
               <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
                 <CreateWorktree
                   worktreeService={worktreeService}
@@ -84,7 +84,7 @@ export function AppRouter({
               </Box>
             )}
 
-            {mode === "list" && (
+            {mode === "list" && worktreeService && (
               <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
                 <ListWorktrees
                   worktreeService={worktreeService}
@@ -98,7 +98,7 @@ export function AppRouter({
               </Box>
             )}
 
-            {mode === "delete" && (
+            {mode === "delete" && worktreeService && (
               <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
                 <DeleteWorktree
                   worktreeService={worktreeService}
@@ -108,7 +108,7 @@ export function AppRouter({
               </Box>
             )}
 
-            {mode === "settings" && (
+            {mode === "settings" && worktreeService && (
               <Box borderStyle="round" paddingX={1} borderColor={borderColor}>
                 <SettingsMenu worktreeService={worktreeService} onBack={onBackToMenu} />
               </Box>

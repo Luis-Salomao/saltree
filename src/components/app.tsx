@@ -220,10 +220,6 @@ export function App({ initialMode = "menu", isFromWrapper = false, onExit }: App
     )
   }
 
-  if (!worktreeService) {
-    return <Text color={COLORS.ERROR}>Failed to initialize worktree service</Text>
-  }
-
   return (
     <AppRouter
       mode={mode}
