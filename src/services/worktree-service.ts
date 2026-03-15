@@ -1,4 +1,5 @@
 import { rmdir } from "node:fs/promises"
+import { join } from "node:path"
 import type { TemplateVariables, WorktreeCreateOptions } from "../types/index.js"
 import { GitWorktreeError, ValidationError } from "../utils/error-handlers.js"
 import { executeGitCommand } from "../utils/git-commands.js"
@@ -6,19 +7,33 @@ import { getRepositoryBaseName, getRepositoryRoot, getWorktreePath } from "../ut
 import { ConfigService } from "./config-service.js"
 import { copyFiles, executePostCreateCommands, openTerminal } from "./file-service.js"
 import { GitService } from "./git-service.js"
+import { WorkspaceService } from "./workspace-service.js"
 
 export class WorktreeService {
   private gitService: GitService
   private configService: ConfigService
   private gitRoot?: string | undefined
+  // workspaceRoot = container dir for path calculations (may differ from gitRoot when .repo/ is used)
+  private workspaceRoot?: string | undefined
 
   constructor(gitRoot?: string | undefined) {
     this.gitRoot = gitRoot
+    this.workspaceRoot = gitRoot
     this.gitService = new GitService(gitRoot)
     this.configService = new ConfigService()
   }
 
   async initialize(): Promise<void> {
+    const initialRoot = this.gitRoot || process.cwd()
+    // Resolve .repo/ pattern: if the dir is a saltree workspace container,
+    // git lives in .repo/ — keep workspaceRoot for path calculations
+    const resolved = await WorkspaceService.resolveRepoPath(initialRoot)
+    if (resolved !== initialRoot) {
+      this.workspaceRoot = initialRoot   // container: use for path calculations
+      this.gitRoot = resolved            // .repo/: use for git commands
+      this.gitService = new GitService(resolved)
+    }
+
     const isValid = await this.gitService.validateRepository()
     if (!isValid) {
       throw new ValidationError("Current directory is not a git repository")
@@ -29,8 +44,8 @@ export class WorktreeService {
 
   async createWorktree(options: WorktreeCreateOptions): Promise<void> {
     const config = this.configService.getConfig()
-    // Use the initialized git root so file copying preserves repo-relative paths
     const gitRoot = this.gitRoot || getRepositoryRoot()
+    const workspaceRoot = this.workspaceRoot || gitRoot
 
     // Only check if branch exists when creating a new branch
     if (
@@ -40,13 +55,18 @@ export class WorktreeService {
       throw new ValidationError(`Branch '${options.newBranch}' already exists`)
     }
 
-    const worktreePath = getWorktreePath(
-      gitRoot,
-      options.name,
-      config.worktreePathTemplate,
-      options.newBranch,
-      options.sourceBranch
-    )
+    // When using .repo/ pattern, worktrees go directly in workspaceRoot/name.
+    // Otherwise use the standard template (e.g. myapp.worktree/name).
+    const worktreePath =
+      workspaceRoot !== gitRoot
+        ? join(workspaceRoot, options.name)
+        : getWorktreePath(
+            gitRoot,
+            options.name,
+            config.worktreePathTemplate,
+            options.newBranch,
+            options.sourceBranch
+          )
 
     if (await this.gitService.worktreeExists(worktreePath)) {
       throw new ValidationError(`Worktree already exists at '${worktreePath}'`)
@@ -54,7 +74,7 @@ export class WorktreeService {
 
     await this.gitService.createWorktree({
       ...options,
-      basePath: options.basePath,
+      basePath: workspaceRoot !== gitRoot ? workspaceRoot : options.basePath,
     })
 
     if (config.worktreeCopyPatterns.length > 0) {

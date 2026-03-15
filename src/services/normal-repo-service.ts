@@ -26,67 +26,68 @@ export class NormalRepoService {
 
   /**
    * Inicializa um workspace novo (git init).
-   * Cria repo normal, .saltree/, initial commit, e primeira worktree.
+   * Estrutura: workspaceRoot/.repo/ (git), workspaceRoot/sal/ (worktree inicial)
    */
   async initNormalRepo(options: WorkspaceCreateOptions): Promise<WorkspaceInfo> {
     const { projectName, baseDir = process.cwd(), defaultBranch = "main" } = options
 
     const workspaceRoot = resolve(baseDir, projectName)
+    const repoPath = join(workspaceRoot, ".repo")
 
-    // 1. Create workspace directory
-    await mkdir(workspaceRoot, { recursive: true })
+    // 1. Create directories
+    await mkdir(repoPath, { recursive: true })
 
-    // 2. Git init (normal repo, not bare), set initial branch name
+    // 2. Git init inside .repo/
     try {
-      await executeGitCommand(["init", "-b", defaultBranch, workspaceRoot], workspaceRoot)
+      await executeGitCommand(["init", "-b", defaultBranch, repoPath], repoPath)
     } catch (error) {
       // `-b` flag requires git 2.28+; fall back to standard init + rename
       try {
-        await executeGitCommand(["init", workspaceRoot], workspaceRoot)
+        await executeGitCommand(["init", repoPath], repoPath)
         await executeGitCommand(
           ["symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`],
-          workspaceRoot
+          repoPath
         )
       } catch (fallbackError) {
-        throw new Error(`Failed to initialize git repo at ${workspaceRoot}: ${fallbackError}`)
+        throw new Error(`Failed to initialize git repo at ${repoPath}: ${fallbackError}`)
       }
     }
 
-    // 3. Create default saltree.config.json (not tracked — in .git/info/exclude)
+    // 3. Create default saltree.config.json in workspace root (not inside .repo)
     await this.createDefaultConfig(workspaceRoot)
 
-    // 4. Empty initial commit (required to allow worktree creation; no files added)
+    // 4. Empty initial commit (required to allow worktree creation)
     try {
       await executeGitCommand(
         ["commit", "--allow-empty", "-m", "chore: initialize workspace"],
-        workspaceRoot
+        repoPath
       )
     } catch (error) {
       throw new Error(`Failed to create initial commit: ${error}`)
     }
 
+    // 5. Create initial worktree (sal/) in workspace root
+    const worktreePath = join(workspaceRoot, "sal")
+    try {
+      await this.createInitialWorktree(repoPath, defaultBranch, worktreePath)
+    } catch (error) {
+      throw new Error(`Failed to create initial worktree: ${error}`)
+    }
+
     // 6. Copy files from copyPatterns (if configured)
     if (this.config.worktreeCopyPatterns.length > 0) {
       try {
-        await copyFiles(workspaceRoot, workspaceRoot, this.config)
+        await copyFiles(worktreePath, worktreePath, this.config)
       } catch (error) {
         console.warn(`Warning: Failed to copy files: ${error}`)
       }
     }
 
-    // 7. Create initial worktree (sal/ on main branch)
-    const initialWorktreeName = "sal"
-    try {
-      await this.createInitialWorktree(workspaceRoot, defaultBranch, initialWorktreeName)
-    } catch (error) {
-      throw new Error(`Failed to create initial worktree: ${error}`)
-    }
-
-    // 8. Execute post-create commands
+    // 7. Execute post-create commands
     if (this.config.postCreateCmd.length > 0) {
       const variables: TemplateVariables = {
         BASE_PATH: workspaceRoot,
-        WORKTREE_PATH: join(workspaceRoot, initialWorktreeName),
+        WORKTREE_PATH: worktreePath,
         BRANCH_NAME: defaultBranch,
         SOURCE_BRANCH: defaultBranch,
       }
@@ -111,7 +112,7 @@ export class NormalRepoService {
 
   /**
    * Clona um repo como normal (git clone).
-   * Cria .saltree/, initial worktree, e executa pós-create.
+   * Estrutura: workspaceRoot/.repo/ (git), workspaceRoot/sal/ (worktree inicial)
    */
   async cloneNormalRepo(options: WorkspaceCreateOptions): Promise<WorkspaceInfo> {
     const { projectName, repoUrl, baseDir = process.cwd(), defaultBranch = "main" } = options
@@ -121,15 +122,19 @@ export class NormalRepoService {
     }
 
     const workspaceRoot = resolve(baseDir, projectName)
+    const repoPath = join(workspaceRoot, ".repo")
 
-    // 1. Git clone
+    // 1. Create workspace container dir
+    await mkdir(workspaceRoot, { recursive: true })
+
+    // 2. Git clone into .repo/
     try {
-      await executeGitCommand(["clone", repoUrl, workspaceRoot], baseDir)
+      await executeGitCommand(["clone", repoUrl, repoPath], workspaceRoot)
     } catch (error) {
       throw new Error(`Failed to clone repo from ${repoUrl}: ${error}`)
     }
 
-    // 2. Create default saltree.config.json if doesn't exist
+    // 3. Create default saltree.config.json in workspace root (not inside .repo)
     try {
       await this.createDefaultConfig(workspaceRoot)
     } catch (error) {
@@ -138,37 +143,36 @@ export class NormalRepoService {
 
     // 4. Checkout default branch (if different from clone default)
     try {
-      const branches = await executeGitCommand(["branch", "-a"], workspaceRoot)
+      const branches = await executeGitCommand(["branch", "-a"], repoPath)
       if (branches.stdout.includes(defaultBranch)) {
-        await executeGitCommand(["checkout", defaultBranch], workspaceRoot)
+        await executeGitCommand(["checkout", defaultBranch], repoPath)
       }
     } catch (error) {
       console.warn(`Warning: Failed to checkout ${defaultBranch}: ${error}`)
     }
 
-    // 5. Copy files from copyPatterns (if configured)
+    // 5. Create initial worktree (sal/) in workspace root
+    const worktreePath = join(workspaceRoot, "sal")
+    try {
+      await this.createInitialWorktree(repoPath, defaultBranch, worktreePath)
+    } catch (error) {
+      console.warn(`Warning: Failed to create initial worktree: ${error}`)
+    }
+
+    // 6. Copy files from copyPatterns (if configured)
     if (this.config.worktreeCopyPatterns.length > 0) {
       try {
-        await copyFiles(workspaceRoot, workspaceRoot, this.config)
+        await copyFiles(worktreePath, worktreePath, this.config)
       } catch (error) {
         console.warn(`Warning: Failed to copy files: ${error}`)
       }
-    }
-
-    // 6. Create initial worktree (sal/ on main branch)
-    const initialWorktreeName = "sal"
-    try {
-      await this.createInitialWorktree(workspaceRoot, defaultBranch, initialWorktreeName)
-    } catch (error) {
-      // Don't fail clone if worktree creation fails
-      console.warn(`Warning: Failed to create initial worktree: ${error}`)
     }
 
     // 7. Execute post-create commands
     if (this.config.postCreateCmd.length > 0) {
       const variables: TemplateVariables = {
         BASE_PATH: workspaceRoot,
-        WORKTREE_PATH: join(workspaceRoot, initialWorktreeName),
+        WORKTREE_PATH: worktreePath,
         BRANCH_NAME: defaultBranch,
         SOURCE_BRANCH: defaultBranch,
       }
@@ -193,26 +197,23 @@ export class NormalRepoService {
   }
 
   /**
-   * Cria a worktree inicial (sal/) na branch padrão.
-   * Para funcionar: detacha o HEAD no workspace root, liberando main para worktree.
+   * Cria a worktree inicial em worktreePath a partir do repoPath (.repo/).
+   * Detacha o HEAD no .repo/ para liberar a branch para a worktree.
    */
   private async createInitialWorktree(
-    workspaceRoot: string,
+    repoPath: string,
     branch: string,
-    worktreeName: string
+    worktreePath: string
   ): Promise<string> {
-    const worktreePath = join(workspaceRoot, worktreeName)
-
     try {
-      // Detach HEAD so 'main' branch is no longer checked out in workspace root.
-      // This allows creating a worktree for 'main' at sal/
-      await executeGitCommand(["checkout", "--detach"], workspaceRoot)
+      // Detach HEAD so 'main' branch is no longer checked out in .repo/
+      await executeGitCommand(["checkout", "--detach"], repoPath)
 
-      // git worktree add sal main (or default branch)
-      await executeGitCommand(["worktree", "add", worktreePath, branch], workspaceRoot)
+      // git worktree add <absolute-path> <branch>
+      await executeGitCommand(["worktree", "add", worktreePath, branch], repoPath)
     } catch (error) {
       throw new Error(
-        `Failed to create worktree ${worktreeName} on branch ${branch}: ${error}`
+        `Failed to create worktree at ${worktreePath} on branch ${branch}: ${error}`
       )
     }
 

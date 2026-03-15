@@ -4,12 +4,30 @@ import { join, resolve } from "node:path"
 /**
  * WorkspaceService — Detects and validates workspace context.
  *
- * A workspace is any directory containing a `.git/` folder.
- * Used to restrict operations (like create-worktree) to workspace context only.
+ * Suporta dois padrões:
+ *   - Repo normal: dir com `.git/` (ou arquivo `.git` em worktrees)
+ *   - Saltree workspace: dir com `.repo/` (git fica em .repo/, worktrees no root)
  */
 export class WorkspaceService {
   /**
-   * Walks up the filesystem from cwd until finding a directory with .git/
+   * Dado um workspaceRoot, retorna o caminho do repo git efetivo.
+   * Se existir `.repo/` dentro, retorna `workspaceRoot/.repo`.
+   * Caso contrário, retorna `workspaceRoot` (padrão normal).
+   */
+  static async resolveRepoPath(workspaceRoot: string): Promise<string> {
+    const repoPath = join(workspaceRoot, ".repo")
+    try {
+      await access(repoPath)
+      return repoPath
+    } catch {
+      return workspaceRoot
+    }
+  }
+
+  /**
+   * Walks up the filesystem from cwd until finding:
+   *   - A directory with `.git` (normal repo or worktree)
+   *   - A directory with `.repo/` (saltree workspace container)
    * Returns the workspace root or null if not found.
    */
   static async detectWorkspace(cwd: string): Promise<string | null> {
@@ -17,21 +35,20 @@ export class WorkspaceService {
     const root = resolve("/") // On Windows, this becomes C:\ or similar
 
     while (current !== root) {
-      const gitDir = join(current, ".git")
-
+      // Standard: .git dir or file (normal repo / worktree)
       try {
-        await access(gitDir)
-        return current // Found .git directory
-      } catch {
-        // Not here, try parent
-      }
+        await access(join(current, ".git"))
+        return current
+      } catch { }
+
+      // Saltree: .repo/ subdir (workspace container pattern)
+      try {
+        await access(join(current, ".repo"))
+        return current
+      } catch { }
 
       const parent = resolve(current, "..")
-      if (parent === current) {
-        // Reached filesystem root without finding .git
-        break
-      }
-
+      if (parent === current) break
       current = parent
     }
 
