@@ -21,6 +21,7 @@
     "generate:schema": "bun run scripts/generate-schema.ts",
     "validate:schema": "bun test tests/schemas/json-schema.test.ts",
     "ci": "bun run typecheck && bun run lint && bun run validate:schema && bun test && bun run build",
+    "prepare": "bun build src/index.tsx --outdir dist --target node --format esm --external yoga-wasm-web",
     "prepack": "bun run build"
   },
   "keywords": [
